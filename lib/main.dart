@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:logger/logger.dart';
 
 void main() {
   runApp(const MyApp());
@@ -12,6 +13,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Device Tracker',
       home: const DeviceListScreen(),
     );
@@ -27,7 +29,7 @@ class DeviceListScreen extends StatefulWidget {
 
 class _DeviceListScreenState extends State<DeviceListScreen> {
   late Future<List<Device>> futureDevices;
-
+  final logger = Logger();
   @override
   void initState() {
     super.initState();
@@ -35,9 +37,11 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
   }
 
   Future<List<Device>> fetchDevices() async {
-    // 示例 API
-    final url = Uri.parse('https://jsonplaceholder.typicode.com/users');
+    //mock API endpoint
+    final url = Uri.parse('https://iot-flutter.free.beeceptor.com/api/devices');
+
     final response = await http.get(url);
+    logger.i("API Response: ${response.body}");
 
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
@@ -45,10 +49,10 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
         return Device(
           id: item['id'].toString(),
           name: item['name'],
-          location: item['address']['city'],
-          status: item['id'] % 2 == 0 ? 'Online' : 'Offline', 
-          battery: '${50 + (item['id'] % 50)}%', 
-          gps: '${item['address']['geo']['lat']}, ${item['address']['geo']['lng']}',
+          location: item['location'],
+          status: item['status'],
+          battery: item['battery'],
+          gps: item['gps'],
         );
       }).toList();
     } else {
@@ -58,40 +62,60 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Devices')),
-      body: FutureBuilder<List<Device>>(
-        future: futureDevices,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('No devices found.'));
-          }
+    return MaterialApp(
+      theme: ThemeData(useMaterial3: false),
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        appBar: AppBar(
+          title: const Text('Devices'),
+          backgroundColor: Colors.tealAccent,
+          titleTextStyle: const TextStyle(
+            color: Colors.black,
+            fontSize: 20,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        body: FutureBuilder<List<Device>>(
+          future: futureDevices,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            } else if (snapshot.hasError) {
+              return Center(child: Text('Error: ${snapshot.error}'));
+            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return const Center(child: Text('No devices found.'));
+            }
 
-          final devices = snapshot.data!;
-          return ListView.builder(
-            itemCount: devices.length,
-            itemBuilder: (context, index) {
-              final device = devices[index];
-              return ListTile(
-                title: Text('Device ${device.id} - ${device.name}'),
-                subtitle: Text('Location: ${device.location}'),
-                trailing: Text(device.status),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => DeviceDetailScreen(device: device),
+            final devices = snapshot.data!;
+            return ListView.builder(
+              itemCount: devices.length,
+              itemBuilder: (context, index) {
+                final device = devices[index];
+                return ListTile(
+                  title: Text('Device ${device.id} - ${device.name}'),
+                  subtitle: Text('Location: ${device.location}'),
+                  trailing: Text(
+                    device.status,
+                    style: TextStyle(
+                      color: device.status.toLowerCase() == 'online'
+                          ? Colors.green
+                          : Colors.red,
+                      fontWeight: FontWeight.bold,
                     ),
-                  );
-                },
-              );
-            },
-          );
-        },
+                  ),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => DeviceDetailScreen(device: device),
+                      ),
+                    );
+                  },
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }
@@ -105,7 +129,18 @@ class DeviceDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Device ${device.id}')),
+      appBar: AppBar(
+        title: const Text('Devices'),
+        backgroundColor: Colors.tealAccent,
+        titleTextStyle: const TextStyle(
+          color: Colors.black,
+          fontSize: 20,
+          fontWeight: FontWeight.w500,
+        ),
+        iconTheme: IconThemeData(
+          color: Colors.black, // 修改 AppBar 上 Icon 的颜色
+        ),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
